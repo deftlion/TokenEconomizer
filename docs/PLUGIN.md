@@ -157,6 +157,12 @@ isolated `CODEX_HOME`, `--dangerously-bypass-hook-trust`; 2026-09-30):
   symlink to the package; the bootstrap then finds the package in the checkout `config.toml`
   records as the marketplace's `source` (verified 2026-10-14). `"${PLUGIN_ROOT:-…}"` in the hook
   command resolves to that copy.
+* A GitHub marketplace works the same way (codex-cli 0.166.0, isolated `CODEX_HOME`, verified
+  2026-11-02): `codex plugin marketplace add microsoft/TokenEconomizer` clones over HTTPS to
+  `$CODEX_HOME/.tmp/marketplaces/<name>` and records `source_type = "git"`; the bootstrap finds the
+  package in that checkout, and `te status` runs from the installed copy. `codex plugin marketplace
+  upgrade <name>` refreshes the checkout, and `codex plugin add` again re-copies the plugin even
+  when `version` is unchanged.
 * End to end: four synthetic rollouts taught it that bare `pytest` is missing; a real Codex
   session then answered "Run tests with `python -m pytest …` because the `pytest` command is
   unavailable here", the guard folded the turn's tool call, and SessionEnd's detached fold priced
