@@ -24,8 +24,8 @@ in [`docs/PLUGIN.md`](../docs/PLUGIN.md).
   folder's `.github/copilot` settings otherwise
 
 No extra API key is needed. Plugins load when a session starts, so start a new session after
-installing. Claude Code installs straight from GitHub (below). Codex and the Copilot CLI install
-from a clone of this repository, which Claude Code can also use:
+installing. Claude Code and Codex install straight from GitHub (below). The Copilot CLI installs
+from a clone of this repository, which Claude Code and Codex can also use:
 
 ```bash
 git clone https://github.com/microsoft/TokenEconomizer.git
@@ -116,9 +116,14 @@ a release with a new version number, then start a new session (or `/reload-plugi
 **1. Install.**
 
 ```bash
-codex plugin marketplace add /path/to/TokenEconomizer
+codex plugin marketplace add microsoft/TokenEconomizer
 codex plugin add tokeneconomizer@tokeneconomizer
+codex plugin list         # should show tokeneconomizer@tokeneconomizer installed, enabled
 ```
+
+Codex clones the repository over HTTPS into its own folder (`$CODEX_HOME/.tmp/marketplaces/`), so
+no SSH key is needed. To install from a clone instead, give `marketplace add` the clone's path:
+`codex plugin marketplace add /path/to/TokenEconomizer`.
 
 **2. Approve its hooks.** Start `codex` in a repository. Codex asks whether to trust the folder
 (**Trust and continue**), then shows **Hooks need review**: choose **Trust all and continue**.
@@ -158,9 +163,11 @@ for `codex resume` and sends no session end, so the plugin learns from it at a l
 start, once it has been quiet for ten minutes. `codex exec` sessions are learned from as they
 end.
 
-**Update.** `git pull` in the clone, then `codex plugin add tokeneconomizer@tokeneconomizer`
-again to refresh Codex's installed copy. Your hook approval is kept unless the update changed the
-hooks themselves; then Codex asks again (**Hooks need review**, or `/hooks`).
+**Update.** From GitHub, run `codex plugin marketplace upgrade tokeneconomizer`; from a clone,
+`git pull` in the clone. Then run `codex plugin add tokeneconomizer@tokeneconomizer` again to
+refresh Codex's installed copy (it re-copies on every run, so the version number need not change).
+Your hook approval is kept unless the update changed the hooks themselves; then Codex asks again
+(**Hooks need review**, or `/hooks`).
 
 **On Windows,** Codex runs each hook's `commandWindows` in its native shell rather than `sh`; it
 starts the hook with the `python` on PATH (3.10 or later), which `TE_PYTHON` does not change.
@@ -174,7 +181,9 @@ starts the hook with the `python` on PATH (3.10 or later), which `TE_PYTHON` doe
 3. Optional: `rm -rf ~/.tokeneconomizer`.
 
 **A self-contained install.** Codex copies an installed plugin, and the copy uses the package in
-your clone. To install a copy that carries the package itself, so the clone can move or go:
+the marketplace it came from: your clone, or the checkout Codex keeps for a GitHub marketplace. To
+install a copy that carries the package itself, so that clone or checkout can move or go (this
+needs a clone to build from):
 
 ```bash
 python3 /path/to/TokenEconomizer/scripts/build_plugin.py --out ~/te-marketplace
@@ -959,7 +968,7 @@ and only when you run it.
 | Symptom | Fix |
 |---|---|
 | a command prints an import error, or the hooks seem to do nothing | run `~/.tokeneconomizer/bin/te doctor` (or `plugin/scripts/te doctor` in the clone) and read its errors.log lines |
-| errors.log says the package "was not found for the plugin" | the clone the plugin was installed from moved or is gone: add it again, or use the [self-contained install](#codex) |
+| errors.log says the package "was not found for the plugin" | the clone the plugin was installed from moved or is gone (on Codex from GitHub, its checkout under `$CODEX_HOME/.tmp/marketplaces/`): add it again, or use the [self-contained install](#codex) |
 | `TokenEconomizer needs Python >= 3.10 (this is 3.x)` | install Python 3.10+ or set `TE_PYTHON` to one |
 | the deny list leaves nothing out after many sessions | run `toolprune refresh-catalog` (Claude Code, Copilot) |
 | a Codex deny list was applied but nothing changed | trust the project in Codex; `~/.tokeneconomizer/bin/te --host codex doctor` says whether it is trusted |

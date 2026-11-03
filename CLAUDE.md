@@ -41,6 +41,10 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
   inside the repository root; a link leading out of it is skipped and the installed plugin
   loses the package. An installed copy is replaced only when `version` in
   `plugin/.claude-plugin/plugin.json` changes, so a change users must receive needs a bump.
+- Codex installs from GitHub too (`codex plugin marketplace add microsoft/TokenEconomizer`, cloned
+  over HTTPS). Its installed copy drops the `lib` link, so `plugin/scripts/te_bootstrap.py` finds
+  the package in Codex's own checkout, `<CODEX_HOME>/.tmp/marketplaces/<marketplace>`; keep that
+  lookup working. `codex plugin add` re-copies on every run, so a Codex update needs no version bump.
 - Standard library only, Python >= 3.10. A hook must start fast and fail open: any exception in
   a hook becomes `{}` and a line in `~/.tokeneconomizer/errors.log`.
 - On-disk state names (`injection.json`, `untool.json`, `envelope.json`, event kinds) are a

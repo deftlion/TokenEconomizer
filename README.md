@@ -119,9 +119,9 @@ login works.
 
 ### Install
 
-Claude Code installs straight from GitHub. Codex, the Copilot CLI and opencode run the plugin from
-a clone, so run their commands in the folder where you want to keep it and leave it in place. Then
-start the agent in one of your repositories.
+Claude Code and Codex install straight from GitHub. The Copilot CLI and opencode run the plugin
+from a clone, so run their commands in the folder where you want to keep it and leave it in place.
+Then start the agent in one of your repositories.
 
 **Claude Code**
 
@@ -140,10 +140,12 @@ Code updates, run `/tokeneconomizer:toolprune refresh-catalog`.
 **Codex**
 
 ```sh
-git clone https://github.com/microsoft/TokenEconomizer.git
-codex plugin marketplace add "$PWD/TokenEconomizer"
+codex plugin marketplace add microsoft/TokenEconomizer
 codex plugin add tokeneconomizer@tokeneconomizer
 ```
+
+To install from a clone instead, for example to work on the plugin, clone the repository and give
+`marketplace add` its absolute path: `codex plugin marketplace add "$PWD/TokenEconomizer"`.
 
 Start `codex`, choose **Trust and continue** for the folder, then at **Hooks need review**
 choose **Trust all and continue**. The hooks take effect from your next Codex session, so quit
@@ -273,7 +275,8 @@ To update:
 | Factory Droid | `git pull` in the clone, then the `build_plugin.py --droid` and install lines again |
 | Hermes Agent | `git pull` in the clone, then `hermes gateway restart` |
 | Antigravity CLI | build the bundle again and `agy plugin install` it |
-| Codex | `git pull` in the clone, then the `codex plugin add` line again |
+| Codex (from GitHub) | `codex plugin marketplace upgrade tokeneconomizer`, then the `codex plugin add` line again |
+| Codex (from a clone) | `git pull` in the clone, then the `codex plugin add` line again |
 | Pi | `pi update --extensions` |
 
 **[`plugin/README.md`](plugin/README.md)** walks through each agent in more detail, including
