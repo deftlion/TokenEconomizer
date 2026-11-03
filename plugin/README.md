@@ -24,13 +24,14 @@ in [`docs/PLUGIN.md`](../docs/PLUGIN.md).
   folder's `.github/copilot` settings otherwise
 
 No extra API key is needed. Plugins load when a session starts, so start a new session after
-installing. Claude Code, Codex and the Copilot CLI install from a clone of this repository:
+installing. Claude Code installs straight from GitHub (below). Codex and the Copilot CLI install
+from a clone of this repository, which Claude Code can also use:
 
 ```bash
 git clone https://github.com/microsoft/TokenEconomizer.git
 ```
 
-Keep the clone where it is: the installed plugin runs from it.
+Keep a clone where it is: an install from it runs from it.
 
 > **Where commands go.** Lines starting with `/` or `$` (`/plugin …`, `/tokeneconomizer:…`,
 > `$tokeneconomizer:…`, `/te …`) are typed into **the agent's prompt**, not your shell. Shell
@@ -41,12 +42,15 @@ Keep the clone where it is: the installed plugin runs from it.
 **1. Install.**
 
 ```bash
-claude plugin marketplace add /path/to/TokenEconomizer
+claude plugin marketplace add microsoft/TokenEconomizer
 claude plugin install tokeneconomizer@tokeneconomizer
 claude plugin list        # should show tokeneconomizer@tokeneconomizer ... enabled
 ```
 
 (Inside Claude Code the same thing is `/plugin marketplace add …` and `/plugin install …`.)
+
+To install from a clone instead, give `marketplace add` the clone's path:
+`claude plugin marketplace add /path/to/TokenEconomizer`.
 
 On Windows, the hooks run under Git for Windows' `sh`, which Claude Code uses for its shell.
 Give the marketplace as an absolute path with forward slashes (`C:/path/to/TokenEconomizer`)
@@ -94,9 +98,10 @@ Each slash command costs one model turn; the same commands are free from a termi
 ([Commands](#commands)). To try the plugin for one session without installing it:
 `claude --plugin-dir /path/to/TokenEconomizer/plugin`.
 
-**Update.** `git pull` in the clone, then start a new session (or `/reload-plugins`): Claude Code
-runs the plugin straight from the clone. If `/tokeneconomizer:status` still shows the old
-behaviour, run `claude plugin update tokeneconomizer@tokeneconomizer`.
+**Update.** From GitHub, run `claude plugin update tokeneconomizer@tokeneconomizer`, which installs
+a release with a new version number, then start a new session (or `/reload-plugins`). From a clone, `git pull` in the clone and start a new session
+(or `/reload-plugins`): Claude Code runs the plugin straight from the clone. If
+`/tokeneconomizer:status` still shows the old behaviour, run the `claude plugin update` line.
 
 **Uninstall.**
 

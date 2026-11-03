@@ -34,6 +34,13 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
 - The mechanisms (`microskills`, `toolprune`, `loopguard`, `trace`) never import
   `tokeneconomizer.plugin`, and nothing under `tokeneconomizer/` imports `experiments/`; both
   are pinned by `tests/test_plugin_package.py`.
+- Claude Code installs from GitHub (`claude plugin marketplace add microsoft/TokenEconomizer`)
+  because `plugin/lib/tokeneconomizer` links to `../../tokeneconomizer`, inside the marketplace
+  root (`.claude-plugin/marketplace.json`, source `./plugin`), and Claude Code copies a link to
+  elsewhere in the marketplace into its cache as real files. Keep the package and that link
+  inside the repository root; a link leading out of it is skipped and the installed plugin
+  loses the package. An installed copy is replaced only when `version` in
+  `plugin/.claude-plugin/plugin.json` changes, so a change users must receive needs a bump.
 - Standard library only, Python >= 3.10. A hook must start fast and fail open: any exception in
   a hook becomes `{}` and a line in `~/.tokeneconomizer/errors.log`.
 - On-disk state names (`injection.json`, `untool.json`, `envelope.json`, event kinds) are a
@@ -51,7 +58,11 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
   made-up sessions and no numbers.
 - The plugin's own text (`plugin/`, its manifests, slash commands and skills, and what the
   hooks print) makes no claims of effect.
-- Tests: `python -m pytest tests experiments/tests`. A change to what the plugin learns or
-  decides should be checked against recorded sessions, not only the unit tests.
+- Tests (offline): `python -m pytest tests experiments/tests`, or with uv and no install,
+  `uv run --no-project --with pytest python -m pytest tests experiments/tests`.
+  `tests/test_codex_cli.py` drives a real Codex install and skips unless `TE_CODEX_E2E=1` with
+  `codex` on `PATH`. A change to what the plugin learns or decides should be checked against
+  recorded sessions, not only the unit tests.
+- Try a hook change without installing: `claude --plugin-dir plugin/`.
 - Every model-backed test goes through the agent's own CLI on a provider you control
   (OpenRouter in development); never hard-code a key.
