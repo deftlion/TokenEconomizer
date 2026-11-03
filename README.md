@@ -119,17 +119,19 @@ login works.
 
 ### Install
 
-Run these commands in the folder where you want to keep the clone. Claude Code, Codex, the
-Copilot CLI and opencode run the plugin from the clone, so leave it in place. Then start the agent
-in one of your repositories.
+Claude Code installs straight from GitHub. Codex, the Copilot CLI and opencode run the plugin from
+a clone, so run their commands in the folder where you want to keep it and leave it in place. Then
+start the agent in one of your repositories.
 
 **Claude Code**
 
 ```sh
-git clone https://github.com/microsoft/TokenEconomizer.git
-claude plugin marketplace add "$PWD/TokenEconomizer"
+claude plugin marketplace add microsoft/TokenEconomizer
 claude plugin install tokeneconomizer@tokeneconomizer
 ```
+
+To install from a clone instead, for example to work on the plugin, clone the repository and give
+`marketplace add` its absolute path: `claude plugin marketplace add "$PWD/TokenEconomizer"`.
 
 Start `claude`, trust the folder (**Yes, I trust this folder**), and run
 `/tokeneconomizer:status`, allowing its script if asked. Once per machine, and again after Claude
@@ -266,7 +268,8 @@ To update:
 
 | Agent | Update |
 |---|---|
-| Claude Code, Copilot CLI, opencode | `git pull` in the clone |
+| Claude Code (from GitHub) | `claude plugin update tokeneconomizer@tokeneconomizer`, which installs a release with a new version number |
+| Claude Code (from a clone), Copilot CLI, opencode | `git pull` in the clone |
 | Factory Droid | `git pull` in the clone, then the `build_plugin.py --droid` and install lines again |
 | Hermes Agent | `git pull` in the clone, then `hermes gateway restart` |
 | Antigravity CLI | build the bundle again and `agy plugin install` it |
