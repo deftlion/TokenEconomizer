@@ -37,6 +37,11 @@ check: test
 build:
     uv build
 
+# Package the local te CLI and its dependencies as dist/te.pyz (requires Python to run).
+shiv:
+    mkdir -p dist
+    uv run --no-project --with shiv --with pip shiv -c te -o dist/te.pyz .
+
 # Build the self-contained plugin bundle; accepts --out and --zip.
 build-plugin *args:
     uv run --no-project python scripts/build_plugin.py {{ args }}
