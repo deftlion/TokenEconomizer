@@ -28,6 +28,8 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
 - `package.json` — the repository as a Pi package (`pi install git:github.com/…`); it names
   the same extension as `plugin/package.json`, which a test pins
 - `scripts/build_plugin.py` — a self-contained plugin bundle for marketplace installs
+- `scripts/dead_code.py` — lists definitions nothing in the repository names (`--fix` deletes
+  them); `.github/workflows/dead-code-sweep.yml` runs it after every merge to main and opens a PR
 - `tests/` — offline tests for the package and the plugin
 
 ## Conventions
@@ -50,7 +52,10 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
 - On-disk state names (`injection.json`, `untool.json`, `envelope.json`, event kinds) are a
   compatibility surface; renaming them strands what users have learned.
 - Settings keep their earlier names as aliases (`inject`, `untool`, `spiral`, ...; see
-  `plugin/config.py`); write new code against the current names.
+  `tokeneconomizer/plugin/config.py`); write new code against the current names.
+- A definition reached only from outside the repository (a host entry point such as Hermes
+  calling `register`) or by a name built at run time needs a line in
+  `scripts/dead_code_allowlist.txt`, or the post-merge sweep may delete it.
 - No run outputs in the repository: transcripts, rows, streams, figures rendered from runs and
   tables derived from them stay out of git (`.gitignore`). The one exception is the paper's
   headline results in `README.md` (the line under the badges, the Results section, and the
