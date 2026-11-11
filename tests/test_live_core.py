@@ -1161,9 +1161,8 @@ def test_every_agent_with_side_calls_has_its_own_paid_model_setting():
 
 @pytest.mark.real_sidecalls
 def test_side_calls_take_a_model_per_agent_and_an_effort(monkeypatch, tmp_path):
-    """`<agent>_paid_model` wins over the shared `paid_model`; `claude_paid_effort` and
-    `codex_paid_effort` reach each CLI in its own form, and only a Claude Code that lists
-    `--effort` is given it."""
+    """Per-agent models win over paid_model; paid_effort reaches Claude, Codex and Pi
+    in each CLI's own form, and only a Claude Code that lists --effort is given it."""
     import subprocess
     from tokeneconomizer.plugin import config as live_config, sidecall
     seen, helps = [], {"new": "  --effort <level>", "old": "  -p"}
@@ -1179,20 +1178,29 @@ def test_side_calls_take_a_model_per_agent_and_an_effort(monkeypatch, tmp_path):
     monkeypatch.setattr(sidecall, "claude_cli", lambda: "new")
     cfg = live_config.load_config(str(tmp_path), env={
         "TE_PAID_MODEL": "shared", "TE_CODEX_PAID_MODEL": "small",
-        "TE_CLAUDE_PAID_EFFORT": "max", "TE_CODEX_PAID_EFFORT": "minimal"})
+        "TE_PAID_EFFORT": "high"})
     assert not cfg.warnings
-    assert not cfg.set("claude_paid_effort", "minimal") and not cfg.set("codex_paid_effort", "x")
-    sidecall.runner_for("claude", cfg)("hi")
-    sidecall.runner_for("codex", cfg)("hi")
-    claude, codex = seen
+    for host in ("claude", "codex", "pi"):
+        runner = sidecall.runner_for(host, cfg)
+        assert runner is not None
+        runner("hi")
+    claude, codex, pi = seen
     assert claude[claude.index("--model") + 1] == "shared"
-    assert claude[claude.index("--effort") + 1] == "max"
+    assert claude[claude.index("--effort") + 1] == "high"
     assert codex[codex.index("-m") + 1] == "small"
-    assert codex[codex.index("-c") + 1] == 'model_reasoning_effort="minimal"'
+    assert codex[codex.index("-c") + 1] == 'model_reasoning_effort="high"'
+    assert pi[pi.index("--model") + 1] == "shared"
+    assert pi[pi.index("--thinking") + 1] == "high"
     sidecall.claude_call("hi", cli="old", effort="high")
     assert "--effort" not in seen[-1]
-    sidecall.runner_for("codex", live_config.LiveConfig())("hi")
-    assert "-m" not in seen[-1] and "-c" not in seen[-1]
+    for host, flag in (("claude", "--effort"), ("codex", "-c"), ("pi", "--thinking")):
+        runner = sidecall.runner_for(host, live_config.LiveConfig())
+        assert runner is not None
+        runner("hi")
+        assert flag not in seen[-1]
+        if host == "codex":
+            assert "-m" not in seen[-1]
+    assert "--model" not in seen[-1]
 
 
 @pytest.mark.real_sidecalls
@@ -1401,7 +1409,8 @@ def test_a_pi_reply_is_read_from_its_json_run():
 
 
 @pytest.mark.real_sidecalls
-def test_a_pi_side_call_is_a_bare_run_on_the_persons_own_pi(monkeypatch):
+@pytest.mark.parametrize("effort", ["", "off", "minimal", "low", "medium", "high", "xhigh"])
+def test_a_pi_side_call_is_a_bare_run_on_the_persons_own_pi(monkeypatch, effort):
     import subprocess
     from tokeneconomizer.plugin import sidecall
     monkeypatch.setattr(sidecall, "program", lambda cli: [cli])
@@ -1416,9 +1425,14 @@ def test_a_pi_side_call_is_a_bare_run_on_the_persons_own_pi(monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
 
     monkeypatch.setattr(sidecall.subprocess, "run", fake_run)
-    text, eff = sidecall.pi_call("propose facts")
+    text, eff = sidecall.pi_call("propose facts", effort=effort)
     assert text == "- use python -m pytest" and eff and eff > 0
     (first, kw), (second, _) = calls
+    for cmd in (first, second):
+        if effort:
+            assert cmd[cmd.index("--thinking") + 1] == effort
+        else:
+            assert "--thinking" not in cmd
     assert first[:4] == ["pi", "--print", "--mode", "json"] and first[-2:] == ["--", "propose facts"]
     for flag in ("--no-session", "--no-tools", "--no-extensions", "--no-context-files"):
         assert flag in first
