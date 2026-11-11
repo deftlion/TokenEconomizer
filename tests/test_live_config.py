@@ -108,6 +108,90 @@ def test_the_names_before_the_rename_still_work(tmp_path):
     assert written["loopguard_thresholds"] == {"edit_churn": 5}
 
 
+@pytest.mark.parametrize("key", ["paid_effort", "claude_paid_effort", "codex_paid_effort"])
+@pytest.mark.parametrize("effort", ["", "off", "none", "minimal", "low", "medium", "high",
+                                  "xhigh", "max"])
+def test_paid_effort_aliases_share_one_validated_setting(key, effort):
+    cfg = LiveConfig()
+    assert cfg.set(key, effort)
+    assert cfg.paid_effort == effort
+    assert cfg.as_dict()["paid_effort"] == effort
+    assert "claude_paid_effort" not in cfg.as_dict()
+    assert "codex_paid_effort" not in cfg.as_dict()
+    assert not cfg.set(key, "unsupported")
+    assert cfg.paid_effort == effort
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("effort", ["", "high"])
+def test_paid_effort_canonical_name_wins_in_files_and_writes(tmp_path, reverse, effort):
+    settings = [("paid_effort", effort), ("claude_paid_effort", "low"),
+                ("codex_paid_effort", "medium")]
+    if reverse:
+        settings.reverse()
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(dict(settings)))
+    cfg = load_config(str(tmp_path), env={})
+    assert not cfg.warnings
+    assert cfg.paid_effort == effort
+    write_config(str(path), dict(settings))
+    assert json.loads(path.read_text()) == {"paid_effort": effort}
+
+
+@pytest.mark.parametrize("key", ["paid_effort", "claude_paid_effort", "codex_paid_effort"])
+def test_paid_effort_old_environment_names_and_new_precedence(tmp_path, key):
+    cfg = load_config(str(tmp_path), env={"TE_" + key.upper(): "low"})
+    assert not cfg.warnings
+    assert cfg.paid_effort == "low"
+    cfg = load_config(str(tmp_path), env={"TE_PAID_EFFORT": "high",
+        "TE_CLAUDE_PAID_EFFORT": "low", "TE_CODEX_PAID_EFFORT": "medium"})
+    assert not cfg.warnings
+    assert cfg.paid_effort == "high"
+
+
+def test_paid_effort_empty_canonical_environment_value_wins(tmp_path):
+    cfg = load_config(str(tmp_path), env={"TE_PAID_EFFORT": "",
+        "TE_CLAUDE_PAID_EFFORT": "low", "TE_CODEX_PAID_EFFORT": "high"})
+    assert not cfg.warnings
+    assert cfg.paid_effort == ""
+
+
+@pytest.mark.parametrize("key", ["paid_effort", "claude_paid_effort", "codex_paid_effort"])
+def test_paid_effort_empty_environment_value_clears_file_setting(tmp_path, key):
+    (tmp_path / "config.json").write_text(json.dumps({
+        "paid_effort": "high", "paid_model": "configured"}))
+    cfg = load_config(str(tmp_path), env={"TE_" + key.upper(): "", "TE_PAID_MODEL": ""})
+    assert not cfg.warnings
+    assert cfg.paid_effort == ""
+    assert cfg.paid_model == "configured"
+
+
+@pytest.mark.parametrize("key", ["paid_effort", "claude_paid_effort", "codex_paid_effort"])
+def test_paid_effort_writes_and_unsets_remove_all_legacy_names(tmp_path, key):
+    path = tmp_path / "config.json"
+    old = {"claude_paid_effort": "low", "codex_paid_effort": "medium", "enabled": False}
+    path.write_text(json.dumps(old))
+    write_config(str(path), {key: "high"})
+    assert json.loads(path.read_text()) == {"paid_effort": "high", "enabled": False}
+    path.write_text(json.dumps(dict(old, paid_effort="high")))
+    unset_config(str(path), [key])
+    assert json.loads(path.read_text()) == {"enabled": False}
+
+
+def test_paid_effort_aliases_keep_config_layer_precedence(tmp_path):
+    root, repo_dir = tmp_path / "global", tmp_path / "repo"
+    root.mkdir()
+    repo_dir.mkdir()
+    (root / "config.json").write_text(json.dumps({"paid_effort": "high"}))
+    (repo_dir / "config.json").write_text(json.dumps({"codex_paid_effort": "low"}))
+    cfg = load_config(str(root), str(repo_dir), env={})
+    assert not cfg.warnings
+    assert cfg.paid_effort == "low"
+    cfg = load_config(str(root), str(repo_dir), env={"TE_CLAUDE_PAID_EFFORT": "medium"})
+    assert not cfg.warnings
+    assert cfg.paid_effort == "medium"
+
+
 def test_the_fact_caps_default_to_the_cores_own():
     from tokeneconomizer.microskills import envfacts
     cfg = LiveConfig()

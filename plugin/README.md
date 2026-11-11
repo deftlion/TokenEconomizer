@@ -855,7 +855,7 @@ first session there ends.
 | `enabled` | `true` | `false`: the whole plugin is off; its hooks return at once and record nothing |
 | `paid_model` | `""` | model for the plugin's own calls on every agent; empty: `haiku` on Claude Code, the agent's own default model on Codex and Pi, on Copilot `COPILOT_PROVIDER_MODEL_ID` or `COPILOT_MODEL` (unless it is `auto`), else a BYOK provider's Haiku, else Copilot's own default |
 | `<agent>_paid_model` | `""` | the same for one agent (`claude`, `codex`, `copilot`, `pi`, `opencode`, `cursor`, `grok`, `hermes`), over `paid_model` |
-| `claude_paid_effort`, `codex_paid_effort` | `""` | the reasoning effort of those calls: Claude Code `low` to `max`, Codex `none` to `max`; which values a model takes is the CLI's to say; empty: the CLI's default |
+| `paid_effort` | `""` | the reasoning effort of those calls on Claude Code, Codex and Pi (`TE_PAID_EFFORT`); Claude uses `--effort`, Codex `model_reasoning_effort`, Pi `--thinking`; which values a CLI and model take is theirs to say; empty: the CLI's default |
 | `pi_extensions` | `""` | Pi only: extension files (comma-separated paths) the plugin's own calls load, for a model whose provider an extension registers |
 | `pi_cli` | `""` | Pi only: the `pi` the plugin's own calls run; empty: the first on PATH |
 | `shadow` | `false` | decide and log everything, act on nothing |
@@ -881,8 +881,10 @@ you choose; in a repository left off, the plugin records nothing:
 with settings such as `inject_max_facts`, `untool_evidence`, `spiral_nudges`, `spiral.<name>` and
 variables `TE_INJECT`, `TE_UNTOOL`, `TE_SPIRAL`, ...; all of them are still read (`spiral=guard`
 as `loopguard=stop`, which works as `nudge`), and a new name set alongside its old one wins.
-`config set` writes the new name. The earlier commands `te facts` and `te untool`, and
-`/tokeneconomizer:facts` and `/tokeneconomizer:untool`, still work.
+`config set` writes the new name. `claude_paid_effort` and `codex_paid_effort`, and their
+`TE_CLAUDE_PAID_EFFORT` and `TE_CODEX_PAID_EFFORT` variables, are also aliases for the shared
+`paid_effort`; its new name wins within each source. The earlier commands `te facts` and
+`te untool`, and `/tokeneconomizer:facts` and `/tokeneconomizer:untool`, still work.
 
 ## Repository map
 

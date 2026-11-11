@@ -49,7 +49,7 @@ person can tune by hand:
   * <agent>_paid_model          -- the model of the plugin's own calls on that agent, over
                                    `paid_model` (claude, codex, copilot, pi, opencode, cursor,
                                    grok, hermes, droid);
-  * claude_paid_effort, codex_paid_effort -- their reasoning effort on those two agents;
+  * paid_effort                -- the reasoning effort of those calls on Claude, Codex and Pi;
   * pi_extensions, pi_cli       -- on Pi, the extensions the plugin's own model calls load (a
                                    custom provider's, whose model they could not reach otherwise;
                                    comma-separated paths), and the `pi` they run;
@@ -99,7 +99,7 @@ _OFF = ("off", "false", "no", "0", "disable", "disabled")
 # Values renamed with their mechanism.
 _VALUE_ALIASES = {"loopguard": {"guard": "stop"}}
 
-# Setting names from before the mechanisms were renamed: old -> new.
+# Earlier setting names: old -> new.
 ALIASES = {
     "inject": "microskills",
     "inject_max_facts": "microskills_max_facts",
@@ -111,6 +111,8 @@ ALIASES = {
     "spiral_aggr": "loopguard_aggr",
     "spiral_nudges": "loopguard_nudges",
     "spiral_thresholds": "loopguard_thresholds",
+    "claude_paid_effort": "paid_effort",
+    "codex_paid_effort": "paid_effort",
 }
 _THRESHOLD_PREFIXES = ("loopguard.", "spiral.")
 
@@ -190,8 +192,7 @@ class LiveConfig:
     grok_paid_model: str = ""
     hermes_paid_model: str = ""
     droid_paid_model: str = ""
-    claude_paid_effort: str = ""
-    codex_paid_effort: str = ""
+    paid_effort: str = ""
     pi_extensions: list = field(default_factory=list)
     pi_cli: str = ""
     hermes_cli: str = ""
@@ -207,11 +208,9 @@ class LiveConfig:
     _CHOICES = {"mode": MODES, "microskills": MICROSKILLS, "toolprune": TOOLPRUNE,
                 "loopguard": LOOPGUARD, "repomap": REPOMAP, "loopguard_aggr": AGGR,
                 "vocabulary": ("auto", "generic", "python-git", "node-web"),
-                # Each CLI's own words (Claude Code 2.1.319, Codex 0.167.0); whether a model
-                # takes one is the CLI's to say.
-                "claude_paid_effort": ("", "low", "medium", "high", "xhigh", "max"),
-                "codex_paid_effort": ("", "none", "minimal", "low", "medium", "high", "xhigh",
-                                      "max")}
+                # The CLIs' own words; whether a CLI and model take one is theirs to say.
+                "paid_effort": ("", "off", "none", "minimal", "low", "medium", "high",
+                                "xhigh", "max")}
     # The smallest value a number setting takes, where it is not 1.
     _MIN = {"toolprune_quiet_minutes": 0}
 
@@ -306,7 +305,8 @@ _ENV = {"TE_MODE": "mode", "TE_SHADOW": "shadow",
         "TE_PAID_MODEL": "paid_model", "TE_VOCABULARY": "vocabulary",
         **{f"TE_{a.upper()}_PAID_MODEL": f"{a}_paid_model" for a in (
             "claude", "codex", "copilot", "pi", "opencode", "cursor", "grok", "hermes", "droid")},
-        "TE_CLAUDE_PAID_EFFORT": "claude_paid_effort", "TE_CODEX_PAID_EFFORT": "codex_paid_effort",
+        "TE_CLAUDE_PAID_EFFORT": "paid_effort", "TE_CODEX_PAID_EFFORT": "paid_effort",
+        "TE_PAID_EFFORT": "paid_effort",
         "TE_INJECT": "microskills", "TE_INJECT_MAX_FACTS": "microskills_max_facts",
         "TE_INJECT_MAX_TOKENS": "microskills_max_tokens",
         "TE_PROPOSE_EVERY": "microskills_propose_every",
@@ -356,8 +356,10 @@ def load_config(root, repo_dir=None, env=None):
             for k, v in _old_names_first(_read(path).items()):
                 cfg.set(k, v, source=f"{label} {path}")
     for var, key in _ENV.items():
-        if env.get(var) not in (None, ""):
-            cfg.set(key, env[var], source=var)
+        value = env.get(var)
+        # An explicit empty effort restores the CLI default, even over a legacy name.
+        if value is not None and (value != "" or key == "paid_effort"):
+            cfg.set(key, value, source=var)
     for var in _ENV_THRESHOLDS:
         if env.get(var):
             try:
@@ -388,7 +390,8 @@ def write_config(path, updates):
         raise ValueError("; ".join(f"`{k}` no longer exists: {OBSOLETE[canonical(k)]}"
                                    for k in gone))
     probe = LiveConfig()
-    bad = [k for k, v in updates.items() if not probe.set(k, v, source="te config")]
+    bad = [k for k, v in _old_names_first(updates.items())
+           if not probe.set(k, v, source="te config")]
     if bad:
         raise ValueError("; ".join(probe.warnings))
     current = _read(path)
