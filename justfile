@@ -1,4 +1,5 @@
-# Requires just and uv; uses just's default shell.
+# Requires just and uv; recipes other than shiv use just's default shell.
+# shiv requires just >=1.44, or >=1.32 with --unstable.
 
 # --- Help ---
 
@@ -37,10 +38,18 @@ check: test
 build:
     uv build
 
-# Package the local te CLI and its dependencies as dist/te.pyz (requires Python to run).
+# Package the te CLI as dist/te.pyz; run with Python on either OS (not a native .exe).
+[script("uv", "run", "--no-project", "--with", "shiv", "--with", "pip", "python")]
 shiv:
-    mkdir -p dist
-    uv run --no-project --with shiv --with pip shiv -c te -o dist/te.pyz .
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    Path("dist").mkdir(exist_ok=True)
+    subprocess.run(
+        [sys.executable, "-m", "shiv", "-c", "te", "-o", "dist/te.pyz", "."],
+        check=True,
+    )
 
 # Build the self-contained plugin bundle; accepts --out and --zip.
 build-plugin *args:
