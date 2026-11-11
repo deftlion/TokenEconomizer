@@ -1,5 +1,5 @@
 name: tokeneconomizer
-version: 0.1.0
+version: 0.1.1
 description: "TokenEconomizer for Hermes Agent: micro-skills (short repository facts learned from earlier sessions) injected into the system prompt, and a guard that redirects a turn stuck in a failing loop."
 author: TokenEconomizer authors
 provides_hooks:

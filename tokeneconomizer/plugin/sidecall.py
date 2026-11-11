@@ -379,13 +379,14 @@ def pi_extension_args(extensions):
         p if p.startswith("builtin:") else os.path.abspath(os.path.expanduser(p)))]
 
 
-def pi_call(prompt, model="", cli="pi", timeout=TIMEOUT_S, extensions=()):
+def pi_call(prompt, model="", cli="pi", timeout=TIMEOUT_S, extensions=(), effort=""):
     model_args = ["--model", model] if model else []
+    effort_args = ["--thinking", effort] if effort else []
     ext_args = pi_extension_args(extensions)
     exe = program(cli)
     with tempfile.TemporaryDirectory(prefix="te-side-", ignore_cleanup_errors=True) as cwd:
         for extra in (["--no-mcp"], []):
-            cmd = [*exe, *PI_FLAGS, *extra, *ext_args, *model_args, "--", prompt]
+            cmd = [*exe, *PI_FLAGS, *extra, *ext_args, *model_args, *effort_args, "--", prompt]
             out = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace",
                                  timeout=timeout, env=_env(), cwd=cwd,
                                  stdin=subprocess.DEVNULL)
@@ -1019,13 +1020,13 @@ def _host_call(host_name, config):
     if host_name in NO_SIDE_CALLS:
         return None
     model = getattr(config, f"{host_name}_paid_model", "") or config.paid_model
-    effort = getattr(config, f"{host_name}_paid_effort", "")
+    effort = getattr(config, "paid_effort", "")
     kw = {"effort": effort} if effort else {}
     if host_name == "pi":
         cli = os.path.expanduser(config.pi_cli) if config.pi_cli else "pi"
         extensions = list(config.pi_extensions)
         return lambda prompt, _m="agent": pi_call(prompt, model=model, cli=cli,
-                                                  extensions=extensions)
+                                                 extensions=extensions, effort=effort)
     if host_name == "opencode":
         return lambda prompt, _m="agent": opencode_call(prompt, model=model)
     if host_name == "cursor":
