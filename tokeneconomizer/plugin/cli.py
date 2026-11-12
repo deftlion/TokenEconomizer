@@ -428,30 +428,33 @@ def cmd_toolprune(args):
     if not denylist.supports(host):
         print(f"tool pruning is not available on {host} (it declares only a handful of tools)")
         return 1
-    unt = ctx.store.read("untool.json") or {}
     action = args.action
     if action == "show":
-        return _toolprune_show(ctx, unt)
+        return _toolprune_show(ctx, ctx.store.read("untool.json") or {})
     if action in ("apply", "restore") and _refuse_unwritable(ctx.store.base):
         return 1
     if action == "apply":
-        tools = args.tools or _proposal(ctx, unt)
-        if not tools:
-            print("nothing to apply")
-            return 0
-        if host == "codex":
-            bad = [t for t in tools if t not in denylist.CODEX_TOGGLES]
-            if bad:
-                print(f"not a removable Codex capability: {', '.join(bad)} (choose from "
-                      f"{', '.join(denylist.CODEX_LIVE_CAPABILITIES)})")
-                return 2
-        try:
-            added = denylist.apply(ctx.repo.root, tools, ctx.store, host=host)
-        except RuntimeError as e:
-            print(f"not applied: {e}")
-            return 1
-        # Named by the person: no longer one they gave back, whatever `restore` said before.
-        denylist.set_kept(ctx.store, ctx.repo.root, host, remove=tools)
+        with ctx.store.locked("mechanisms") as got:
+            if not got:
+                print("not applied: repository mechanisms are busy; try again in a minute")
+                return 1
+            tools = args.tools or _proposal(ctx, ctx.store.read("untool.json") or {})
+            if not tools:
+                print("nothing to apply")
+                return 0
+            if host == "codex":
+                bad = [t for t in tools if t not in denylist.CODEX_TOGGLES]
+                if bad:
+                    print(f"not a removable Codex capability: {', '.join(bad)} (choose from "
+                          f"{', '.join(denylist.CODEX_LIVE_CAPABILITIES)})")
+                    return 2
+            try:
+                added = denylist.apply(ctx.repo.root, tools, ctx.store, host=host)
+            except RuntimeError as e:
+                print(f"not applied: {e}")
+                return 1
+            # Named by the person: no longer one they gave back, whatever `restore` said before.
+            denylist.set_kept(ctx.store, ctx.repo.root, host, remove=tools)
         print(f"added: {', '.join(added) or '(already present)'}\n"
               f"in {denylist.settings_path(ctx.repo.root, host)} -- takes effect from the next "
               f"session.")
@@ -478,14 +481,18 @@ def cmd_toolprune(args):
                     f"{k}={'on' if v else 'off'}" for k, v in sorted(state.items())))
         return 0
     if action == "restore":
-        try:
-            removed = denylist.restore(ctx.repo.root, ctx.store, args.tools or None, host=host)
-        except RuntimeError as e:
-            print(f"not restored: {e}")
-            return 1
-        # Given back by the person: `toolprune: auto` must not take them away again at the next
-        # fold, and a proposal does not ask for them again.
-        denylist.set_kept(ctx.store, ctx.repo.root, host, add=removed)
+        with ctx.store.locked("mechanisms") as got:
+            if not got:
+                print("not restored: repository mechanisms are busy; try again in a minute")
+                return 1
+            try:
+                removed = denylist.restore(ctx.repo.root, ctx.store, args.tools or None, host=host)
+            except RuntimeError as e:
+                print(f"not restored: {e}")
+                return 1
+            # Given back by the person: `toolprune: auto` must not take them away again at the next
+            # fold, and a proposal does not ask for them again.
+            denylist.set_kept(ctx.store, ctx.repo.root, host, add=removed)
         print(f"removed: {', '.join(removed) or '-'} (from the next session)"
               + (f"; kept from now on (`toolprune apply {removed[0]}` removes one again)"
                  if removed else ""))
@@ -501,8 +508,8 @@ def cmd_toolprune(args):
         print(f"{len(tools)} tools recorded in {path}:\n  " + ", ".join(tools))
         return 0
     if action == "measure":
-        tools = args.tools or _proposal(ctx, unt) or denylist.applied_for(
-            ctx.store, ctx.repo.root, host)
+        tools = (args.tools or _proposal(ctx, ctx.store.read("untool.json") or {})
+                 or denylist.applied_for(ctx.store, ctx.repo.root, host))
         if not tools:
             print("no proposal to measure")
             return 1
@@ -642,10 +649,9 @@ def cmd_config(args):
 
 def cmd_fold(args):
     # A session is folded into the repository it is pinned to, wherever `--cwd` points.
-    ctx = _session_ctx(args, (args.session or [None])[0])
-    sids = args.session or fold.pending_sessions(ctx)
+    sids = args.session or fold.pending_sessions(_ctx(args))
     for sid in sids:
-        rec = fold.fold_session(ctx, sid)
+        rec = fold.fold_session(_session_ctx(args, sid), sid)
         if rec is not None and args.verbose:
             print(json.dumps(rec, default=str))
     return 0
@@ -749,11 +755,17 @@ def cmd_repos(args):
             print(f"not a state directory key: {bad[0]!r} (keys as `te repos` lists them)")
             return 2
         src = args.keys[0]
-        if not os.path.isdir(os.path.join(repos.repos_dir(root), src)):
-            print(f"no state directory {src!r} in {repos.repos_dir(root)}")
-            return 2
         into = args.keys[1] if len(args.keys) > 1 else _ctx(args).repo
         into_key = into if isinstance(into, str) else into.key
+        base = repos.repos_dir(root)
+        for key in (src, into_key):
+            if (not key or key in (".", "..") or "/" in key or "\\" in key
+                    or os.path.splitdrive(key)[0] or os.path.islink(os.path.join(base, key))):
+                print(f"invalid state directory key {key!r} (use a key from `te repos`)")
+                return 2
+        if not os.path.isdir(os.path.join(base, src)):
+            print(f"no state directory {src!r} in {base}")
+            return 2
         if into_key == src:
             print(f"{src} is this repository's own state; name the one to merge into it")
             return 2
@@ -992,9 +1004,19 @@ def _recent_host(cwd):
     seen = {}
     for name in hosts.HOSTS:
         d = repo_state_dir(repo, name)
-        if os.path.isdir(d):
-            seen[name] = max([os.path.getmtime(d)] + [os.path.getmtime(os.path.join(d, f))
-                                                      for f in os.listdir(d)])
+        if not os.path.isdir(d):
+            continue
+        try:
+            changed = os.path.getmtime(d)
+            entries = os.listdir(d)
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                changed = max(changed, os.path.getmtime(os.path.join(d, entry)))
+            except OSError:
+                continue
+        seen[name] = changed
     return max(seen, key=seen.get) if seen else None
 
 
