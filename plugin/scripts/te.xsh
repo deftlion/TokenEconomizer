@@ -1,10 +1,11 @@
 #!/usr/bin/env xonsh
 """TokenEconomizer command line (`te status`, `te toolprune show`, `te config`, ...).
 
-A xonsh port of `te`: run `te_bootstrap.py cli` under the first Python 3 found, passing the
-arguments through. On Windows the Microsoft Store alias under WindowsApps runs nothing, and every
-probe of it starts AppXSvc (python/pymanager#396), so a Python outside WindowsApps is tried first
-and the alias is probed only as a last resort; `py` is the final candidate.
+A xonsh port of `te`: run `te_bootstrap.py cli` under $TE_PYTHON when set, otherwise the first
+Python 3 found, passing the arguments through. During discovery on Windows the Microsoft Store
+alias under WindowsApps runs nothing, and every probe of it starts AppXSvc (python/pymanager#396),
+so a Python outside WindowsApps is tried first and the alias is probed only as a last resort;
+`py` is the final candidate.
 """
 import os
 import sys
@@ -20,11 +21,6 @@ windows = ${...}.get("OS") == "Windows_NT"
 $PYTHONUTF8 = "1"
 
 
-def candidates(*names):
-    """$TE_PYTHON when set and non-empty, then `names`."""
-    return [name for name in (${...}.get("TE_PYTHON"), *names) if name]
-
-
 def launcher_flags(name):
     """`py` is the Windows launcher; `-3` asks it for a Python 3."""
     return ["-3"] if name == "py" else []
@@ -35,9 +31,7 @@ def outside_windowsapps(name):
     for entry in $PATH:
         if not entry or "WindowsApps" in entry:
             continue
-        # Join as text: `Path(entry) / name` would drop `entry` for an absolute $TE_PYTHON and
-        # hand back the WindowsApps alias itself.
-        for path in (Path(f"{entry}/{name}.exe"), Path(f"{entry}/{name}")):
+        for path in (Path(entry) / f"{name}.exe", Path(entry) / name):
             if path.is_file() and os.access(path, os.X_OK):
                 return str(path)
     return None
@@ -54,19 +48,24 @@ def hand_off(python, *flags):
     sys.exit(![@error_ignore xexec @(argv)].returncode)
 
 
+# An explicit interpreter is authoritative: bypass discovery and fail if it cannot run.
+python = ${...}.get("TE_PYTHON")
+if python:
+    hand_off(python, *launcher_flags(python))
+
 if windows:
-    for name in candidates("python3", "python", "py"):
+    for name in ("python3", "python", "py"):
         python = locate_executable(name)
         if python and "WindowsApps" in python:
             python = outside_windowsapps(name)
         if python:
             hand_off(python, *launcher_flags(name))
     # Only the WindowsApps alias was found: take the first candidate that actually runs.
-    for name in candidates("python3", "python", "py"):
+    for name in ("python3", "python", "py"):
         if locate_executable(name) and !(@(name) -c "" < @(os.devnull)):
             hand_off(name, *launcher_flags(name))
 else:
-    for name in candidates("python3", "python"):
+    for name in ("python3", "python"):
         if locate_executable(name):
             hand_off(name)
 
