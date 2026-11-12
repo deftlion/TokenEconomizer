@@ -1,6 +1,6 @@
 # Maintainer: Jeff C <pub@jeffc.ca>
 pkgname=tokeneconomizer
-pkgver=0.1.1.r202.g393d4e2
+pkgver=0.1.1.r221.g97fd328
 pkgrel=1
 pkgdesc='Token-efficiency tools and agent plugins for Claude Code, Codex, Copilot CLI and Pi'
 arch=('any')
@@ -16,7 +16,7 @@ optdepends=(
 )
 # Build this fork's committed state, not an upstream release or uncommitted edits.
 # Keep this PKGBUILD in the checkout's pkgbuild/ directory.
-_commit=393d4e24299e150d97c873ebb8e2e92479e15114
+_commit=97fd3285efefc2235e1909082df1ee95828e3afe
 source=("TokenEconomizer::git+file://${startdir}/..#commit=${_commit}")
 sha256sums=('SKIP')
 
