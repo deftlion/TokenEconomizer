@@ -1,0 +1,23 @@
+pkgbase = tokeneconomizer
+	pkgdesc = Token-efficiency tools and agent plugins for Claude Code, Codex, Copilot CLI and Pi
+	pkgver = 0.1.1.r202.g393d4e2
+	pkgrel = 1
+	url = https://github.com/microsoft/TokenEconomizer
+	arch = any
+	license = Apache-2.0
+	checkdepends = python-pytest
+	checkdepends = nodejs
+	makedepends = git
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	makedepends = python-wheel
+	depends = python>=3.10
+	depends = sh
+	optdepends = pi: Pi agent integration
+	optdepends = nodejs: JavaScript agent integrations
+	optdepends = aider-chat: optional repository-map generation
+	source = TokenEconomizer::git+file:///home/jeff/code/fork/TokenEconomizer/pkgbuild/..#commit=393d4e24299e150d97c873ebb8e2e92479e15114
+	sha256sums = SKIP
+
+pkgname = tokeneconomizer
