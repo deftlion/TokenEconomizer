@@ -26,6 +26,18 @@ SH = [git_sh() or "sh"] if os.name == "nt" else []
 EVENTS = {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SessionEnd"}
 
 
+@pytest.fixture(scope="module")
+def isolated_python(tmp_path_factory):
+    """A Python that cannot import an installed `tokeneconomizer` (a venv without the system
+    site-packages), for `TE_PYTHON`. Under one that can, the launcher's last resort finds the
+    installed package, so an install copy would run whether or not its own lookup works."""
+    import venv
+    env = tmp_path_factory.mktemp("venv")
+    venv.EnvBuilder(with_pip=False).create(str(env))
+    python = env / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    return python.as_posix()
+
+
 def _json(*parts):
     with open(os.path.join(*parts), encoding="utf-8") as fh:
         return json.load(fh)
@@ -758,7 +770,8 @@ def test_the_plugin_carries_the_core_as_symlinks_an_install_copy_follows(tmp_pat
     assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
 
 
-def test_a_codex_install_copy_finds_the_core_in_the_marketplace_it_came_from(tmp_path):
+def test_a_codex_install_copy_finds_the_core_in_the_marketplace_it_came_from(tmp_path,
+                                                                            isolated_python):
     """Codex installs a COPY of plugin/ that drops the `lib` symlink (0.153.1), so the copy
     finds the core through the marketplace's `source` in Codex's config.toml."""
     import shutil
@@ -778,7 +791,8 @@ def test_a_codex_install_copy_finds_the_core_in_the_marketplace_it_came_from(tmp
         return subprocess.run(SH + [str(copy / "scripts" / "te"), "doctor"], capture_output=True,
                               text=True, timeout=60, cwd=str(tmp_path),
                               env=dict(os.environ, TOKENECONOMIZER_HOME=str(tmp_path / "h"),
-                                       TE_CORE_PATH="", PYTHONPATH=""))
+                                       TE_CORE_PATH="", PYTHONPATH="",
+                                       TE_PYTHON=isolated_python))
     out = te(REPO)
     assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
     out = te(REPO, literal=True)
@@ -823,7 +837,8 @@ def test_the_codex_marketplace_source_is_read_in_either_toml_string_form(tmp_pat
     assert source('source = "/home/me/TokenEconomizer"') == ["/home/me/TokenEconomizer"]
 
 
-def test_a_claude_install_copy_without_symlinks_finds_the_core_in_its_marketplace(tmp_path):
+def test_a_claude_install_copy_without_symlinks_finds_the_core_in_its_marketplace(
+        tmp_path, isolated_python):
     """On a checkout without symlinks (Windows), `lib/tokeneconomizer` is a file holding the
     link's target, and Claude Code's install copy (`~/.claude/plugins/cache/...`) carries that
     file, not the package. The copy finds the core through the marketplace Claude Code recorded
@@ -842,7 +857,8 @@ def test_a_claude_install_copy_without_symlinks_finds_the_core_in_its_marketplac
         return subprocess.run(SH + [str(copy / "scripts" / "te"), "doctor"], capture_output=True,
                               text=True, timeout=60, cwd=str(tmp_path),
                               env=dict(os.environ, TOKENECONOMIZER_HOME=str(tmp_path / "h"),
-                                       TE_CORE_PATH="", PYTHONPATH=""))
+                                       TE_CORE_PATH="", PYTHONPATH="",
+                                       TE_PYTHON=isolated_python))
     out = te(REPO)
     assert out.returncode == 0 and "python" in out.stdout, out.stderr[-500:]
     out = te(str(tmp_path / "nowhere"))
