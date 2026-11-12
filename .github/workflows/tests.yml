@@ -40,6 +40,19 @@ jobs:
         env:
           COLUMNS: "200"
 
+  experiments:
+    # Offline tests: no Docker, benchmark data or API keys.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: python -m pip install pytest
+      - run: python -m pytest experiments/tests -rfEs --tb=short
+        env:
+          COLUMNS: "200"
+
   codex:
     # The plugin installed and run by a real Codex CLI (tests/test_codex_cli.py): its install
     # copy finds the package through the `source` Codex writes, which Codex writes differently on
