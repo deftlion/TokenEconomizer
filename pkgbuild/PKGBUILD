@@ -1,0 +1,52 @@
+# Maintainer: Jeff C <pub@jeffc.ca>
+pkgname=tokeneconomizer
+pkgver=0.1.1.r202.g393d4e2
+pkgrel=1
+pkgdesc='Token-efficiency tools and agent plugins for Claude Code, Codex, Copilot CLI and Pi'
+arch=('any')
+url='https://github.com/microsoft/TokenEconomizer'
+license=('Apache-2.0')
+depends=('python>=3.10' 'sh')
+makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+checkdepends=('python-pytest' 'nodejs')
+optdepends=(
+  'pi: Pi agent integration'
+  'nodejs: JavaScript agent integrations'
+  'aider-chat: optional repository-map generation'
+)
+# Build this fork's committed state, not an upstream release or uncommitted edits.
+# Keep this PKGBUILD in the checkout's pkgbuild/ directory.
+_commit=393d4e24299e150d97c873ebb8e2e92479e15114
+source=("TokenEconomizer::git+file://${startdir}/..#commit=${_commit}")
+sha256sums=('SKIP')
+
+build() {
+  cd TokenEconomizer || return
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd TokenEconomizer || return
+  # Do not load unrelated global pytest plugins or require an optional Codex CLI.
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests experiments/tests \
+    --deselect=experiments/tests/test_codex_routing.py::test_bundled_system_skills_are_read_from_the_installed_cli \
+    --deselect=experiments/tests/test_spiral.py::test_the_resume_invocation_is_one_the_installed_cli_accepts
+}
+
+package() {
+  cd TokenEconomizer || return
+  python -m installer --destdir="$pkgdir" dist/*.whl
+
+  # Pi loads this package.json directly; the other adapters share its launchers.
+  local _plugindir="$pkgdir/usr/lib/node_modules/$pkgname"
+  install -dm755 "$_plugindir"
+  cp -a plugin/. "$_plugindir/"
+  # The checkout-relative core link would be broken here. The bootstrap falls
+  # back to the Python package installed above, without a second bundled copy.
+  rm -rf "${_plugindir:?}/lib"
+  find "$_plugindir" -type d -name __pycache__ -prune -exec rm -rf {} +
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/PLUGIN.md "$pkgdir/usr/share/doc/$pkgname/PLUGIN.md"
+}

@@ -47,3 +47,11 @@ experiments/figures/
 
 # Pi installs this repository as a package and runs `npm install` in its checkout.
 /package-lock.json
+
+# --- Arch packaging outputs ---
+/pkgbuild/src/
+/pkgbuild/pkg/
+/pkgbuild/TokenEconomizer/
+/pkgbuild/*.pkg.tar*
+/pkgbuild/*.src.tar*
+/pkgbuild/*.log
