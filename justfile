@@ -45,6 +45,8 @@ shiv:
     from pathlib import Path
     import subprocess
     import sys
+    
+    OUT_PERM = 711
 
     dist = Path("dist")
     dist.mkdir(exist_ok=True)
@@ -59,7 +61,9 @@ shiv:
     # shifts eocd_offset by len(launcher) and makes eocd - (cd_size + cd_offset)
     # match the launcher's length, pointing directly to the shebang's start (#!).
     launcher = files("pip._vendor.distlib").joinpath("t64.exe").read_bytes()
-    (dist / "te.exe").write_bytes(launcher + pyz.read_bytes())
+    out = (dist / "te.exe")
+    out.write_bytes(launcher + pyz.read_bytes())
+    out.chmod(OUT_PERM)
 
 # Build the self-contained plugin bundle; accepts --out and --zip.
 build-plugin *args:
