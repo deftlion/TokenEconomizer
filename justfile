@@ -38,18 +38,28 @@ check: test
 build:
     uv build
 
-# Package the te CLI as dist/te.pyz; run with Python on either OS (not a native .exe).
+# Package the te CLI as dist/te.pyz and a Windows PE launcher dist/te.exe.
 [script("uv", "run", "--no-project", "--with", "shiv", "--with", "pip", "python")]
 shiv:
+    from importlib.resources import files
+    from pathlib import Path
     import subprocess
     import sys
-    from pathlib import Path
 
-    Path("dist").mkdir(exist_ok=True)
+    dist = Path("dist")
+    dist.mkdir(exist_ok=True)
+    pyz = dist / "te.pyz"
     subprocess.run(
         [sys.executable, "-m", "shiv", "-c", "te", "-o", "dist/te.pyz", "."],
         check=True,
     )
+    # The offset calculation is directly related to the position of the shebang:
+    # zipapp includes the shebang in the .pyz archive's reported central-directory
+    # offset (eocd - (cd_size + cd_offset) == 0), so concatenating distlib's t64.exe
+    # shifts eocd_offset by len(launcher) and makes eocd - (cd_size + cd_offset)
+    # match the launcher's length, pointing directly to the shebang's start (#!).
+    launcher = files("pip._vendor.distlib").joinpath("t64.exe").read_bytes()
+    (dist / "te.exe").write_bytes(launcher + pyz.read_bytes())
 
 # Build the self-contained plugin bundle; accepts --out and --zip.
 build-plugin *args:
