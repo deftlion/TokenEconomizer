@@ -68,7 +68,7 @@ agent behavior, and `docs/ARCHITECTURE.md` for how the package fits together.
 - The plugin's own text (`plugin/`, its manifests, slash commands and skills, and what the
   hooks print) makes no claims of effect.
 - Tests (offline): `python -m pytest tests experiments/tests`, or with uv and no install,
-  `uv run --no-project --with pytest python -m pytest tests experiments/tests`.
+  `uv run --no-project --with pytest --with pip python -m pytest tests experiments/tests`.
   `tests/test_codex_cli.py` drives a real Codex install and skips unless `TE_CODEX_E2E=1` with
   `codex` on `PATH`. A change to what the plugin learns or decides should be checked against
   recorded sessions, not only the unit tests.

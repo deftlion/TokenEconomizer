@@ -23,8 +23,8 @@ dependencies = []
 te = "tokeneconomizer.plugin.cli:main"
 
 [project.optional-dependencies]
-# Test suite is offline (no Docker / no datasets).
-test = ["pytest>=7.0"]
+# Test suite is offline (no Docker / no datasets); recipe tests use pip's distlib launcher.
+test = ["pytest>=7.0", "pip"]
 # The reference task-execution harness under experiments/te_harness/ (see
 # experiments/README.md). It adds no
 # PyPI dependency -- it is stdlib-only at import time and the official SWE-bench grader is
