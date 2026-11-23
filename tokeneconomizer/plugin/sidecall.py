@@ -60,6 +60,7 @@ empty session behind each time. Nothing here runs unless micro-skills is on (the
 or the loop guard is (the judge and the nudge writer).
 """
 import json
+import logging
 import os
 import re
 import shutil
@@ -69,6 +70,24 @@ import tempfile
 
 from .. import trace
 from . import accounting
+
+
+class _StderrHandler(logging.StreamHandler):
+    def emit(self, record):
+        self.stream = sys.stderr
+        super().emit(record)
+
+
+def _configured_level(record):
+    level = getattr(record, "sidecall_log_level", "warning").upper()
+    return record.levelno >= getattr(logging, level, logging.WARNING)
+
+
+logger = logging.Logger("tokeneconomizer.sidecall", logging.DEBUG)
+_handler = _StderrHandler()
+_handler.setFormatter(logging.Formatter("sidecall %(levelname)s: %(message)s"))
+_handler.addFilter(_configured_level)
+logger.addHandler(_handler)
 
 
 def _obj(v):
@@ -102,22 +121,38 @@ def _log(text):
         pass
 
 
-def _noted(host, call):
+def _noted(host, call, config=None, role=None):
     """`call`, with a side call that raises noted in errors.log before it propagates. Both
     callers catch it -- the judge records a short `runner-error`, the proposer skips its tick --
     so without this note a CLI that keeps failing would leave no trace of why. One line, and
     never the command: most hosts take the prompt on argv, a `TimeoutExpired` names its whole
     command, and `te doctor` prints this file's tail."""
+    log_config = {"sidecall_log_level": getattr(config, "log_level", "warning")}
+
     def run(prompt, model="agent"):
+        logger.log(logging.INFO, "host call started (host=%s, role=%s)", host, role,
+                   extra=log_config)
         try:
-            return call(prompt, model)
+            result = call(prompt, model)
+            if isinstance(result, tuple) and result and not result[0]:
+                logger.log(logging.WARNING, "host call returned no reply (host=%s, role=%s)",
+                           host, role, extra=log_config)
+            logger.log(logging.INFO, "host call finished (host=%s, role=%s)", host, role,
+                       extra=log_config)
+            return result
         except subprocess.TimeoutExpired as e:
+            logger.log(logging.WARNING, "host call timed out (host=%s, role=%s)", host, role,
+                       extra=log_config)
             _log(f"sidecall {host}: no reply (timed out after {e.timeout:g}s)\n")
             raise
         except subprocess.CalledProcessError as e:
+            logger.log(logging.WARNING, "host call failed (host=%s, role=%s, exit=%s)",
+                       host, role, e.returncode, extra=log_config)
             _log(f"sidecall {host}: no reply (exit {e.returncode})\n")
             raise
         except Exception as e:
+            logger.log(logging.WARNING, "host call raised %s (host=%s, role=%s)",
+                       type(e).__name__, host, role, extra=log_config)
             what = " ".join(str(e).split())[:200]
             _log(f"sidecall {host}: failed ({type(e).__name__}: {what})\n")
             raise
@@ -866,12 +901,17 @@ def local_runner(role, config, fallback=None):
     if not local_routes(role, config) or not fm_available():
         return None
     schema = ROLE_SCHEMAS.get(role)
+    log_config = {"sidecall_log_level": getattr(config, "log_level", "warning")}
 
     def run(prompt, model="agent"):
+        logger.log(logging.INFO, "local call started (role=%s)", role, extra=log_config)
         text, eff = fm_call(prompt, schema=schema)
         run.answered_locally = text is not None
         if text is not None:
+            logger.log(logging.INFO, "local call finished (role=%s)", role, extra=log_config)
             return text, eff
+        logger.log(logging.WARNING, "local call returned no reply (role=%s, fallback=%s)",
+                   role, fallback is not None, extra=log_config)
         return fallback(prompt, model) if fallback is not None else ("", 0)
     run.local = "fm"
     run.answered_locally = False
@@ -1008,11 +1048,18 @@ def runner_for(host_name, config, role=None):
     (`local_runner`), falling back to the host's CLI when the local call fails; on a host in
     `NO_SIDE_CALLS` the local model is the only runner."""
     call = _host_call(host_name, config)
-    host = None if call is None else _noted(host_name, call)
+    configured_model = getattr(config, f"{host_name}_paid_model", "") or config.paid_model
+    logger.log(logging.DEBUG, "host configuration (host=%s, role=%s, configured_model=%r)",
+               host_name, role, configured_model or None,
+               extra={"sidecall_log_level": getattr(config, "log_level", "warning")})
+    host = None if call is None else _noted(host_name, call, config, role)
     if role is not None:
         local = local_runner(role, config, fallback=host)
         if local is not None:
             return local
+    if host is None:
+        logger.log(logging.DEBUG, "no side-call runner (host=%s, role=%s)", host_name, role,
+                   extra={"sidecall_log_level": getattr(config, "log_level", "warning")})
     return host
 
 
