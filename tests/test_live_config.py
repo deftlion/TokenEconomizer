@@ -27,6 +27,19 @@ def test_each_mechanism_takes_a_plain_on_and_off(key, on):
     assert not cfg.set(key, "sometimes") and getattr(cfg, key) == "off"
 
 
+def test_log_level_config_is_validated_and_loaded(tmp_path):
+    cfg = LiveConfig()
+    assert cfg.log_level == "warning"
+    assert cfg.set("log_level", "debug")
+    assert not cfg.set("log_level", "loud")
+    assert cfg.log_level == "debug"
+    root = tmp_path / "state"
+    root.mkdir()
+    write_config(str(root / "config.json"), {"log_level": "info"})
+    assert load_config(str(root), env={}).log_level == "info"
+    assert load_config(str(root), env={"TE_LOG_LEVEL": "error"}).log_level == "error"
+
+
 def test_a_guard_threshold_is_typed_and_range_checked():
     cfg = LiveConfig()
     assert cfg.set("loopguard.min_turns", "12") and cfg.loopguard_thresholds["min_turns"] == 12

@@ -219,6 +219,7 @@ class LiveConfig:
     hermes_paid_model: str = ""
     droid_paid_model: str = ""
     paid_effort: str = ""
+    log_level: str = "warning"
     local_model: str = "off"
     local_roles: list = field(default_factory=lambda: ["judge"])
     local_judge_confidence: float = 0.9
@@ -237,6 +238,7 @@ class LiveConfig:
     _CHOICES = {"mode": MODES, "microskills": MICROSKILLS, "toolprune": TOOLPRUNE,
                 "loopguard": LOOPGUARD, "repomap": REPOMAP, "loopguard_aggr": AGGR,
                 "local_model": LOCAL_MODELS,
+                "log_level": ("debug", "info", "warning", "error", "critical"),
                 "vocabulary": ("auto", "generic", "python-git", "node-web"),
                 # The CLIs' own words; whether a CLI and model take one is theirs to say.
                 "paid_effort": ("", "off", "none", "minimal", "low", "medium", "high",
@@ -353,7 +355,7 @@ _ENV = {"TE_MODE": "mode", "TE_SHADOW": "shadow",
         **{f"TE_{a.upper()}_PAID_MODEL": f"{a}_paid_model" for a in (
             "claude", "codex", "copilot", "pi", "opencode", "cursor", "grok", "hermes", "droid")},
         "TE_CLAUDE_PAID_EFFORT": "paid_effort", "TE_CODEX_PAID_EFFORT": "paid_effort",
-        "TE_PAID_EFFORT": "paid_effort",
+        "TE_PAID_EFFORT": "paid_effort", "TE_LOG_LEVEL": "log_level",
         "TE_LOCAL_MODEL": "local_model", "TE_LOCAL_ROLES": "local_roles",
         "TE_LOCAL_JUDGE_CONFIDENCE": "local_judge_confidence",
         "TE_INJECT": "microskills", "TE_INJECT_MAX_FACTS": "microskills_max_facts",

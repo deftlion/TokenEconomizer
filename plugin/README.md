@@ -945,6 +945,7 @@ first session there ends.
 | `paid_model` | `""` | model for the plugin's own calls on every agent; empty: `haiku` on Claude Code, the agent's own default model on Codex and Pi, on Copilot `COPILOT_PROVIDER_MODEL_ID` or `COPILOT_MODEL` (unless it is `auto`), else a BYOK provider's Haiku, else Copilot's own default |
 | `<agent>_paid_model` | `""` | the same for one agent (`claude`, `codex`, `copilot`, `pi`, `opencode`, `cursor`, `grok`, `hermes`), over `paid_model` |
 | `paid_effort` | `""` | the reasoning effort of those calls on Claude Code, Codex and Pi (`TE_PAID_EFFORT`); Claude uses `--effort`, Codex `model_reasoning_effort`, Pi `--thinking`; which values a CLI and model take is theirs to say; empty: the CLI's default |
+| `log_level` | `warning` | fold diagnostics: `debug`, `info`, `warning`, `error`, or `critical` (`TE_LOG_LEVEL`). Detached folds write to the repository state directory's `fold.log`; `te fold` writes diagnostics to stderr. This does not change side-call logging or `te fold --verbose`. |
 | `local_model` | `off` | `fm`: run the side calls `local_roles` names on Apple's on-device Foundation Models CLI (`/usr/bin/fm`, macOS 27 with Apple Intelligence) instead of the agent's CLI; see [On-device side calls](#on-device-side-calls-macos) |
 | `local_roles` | `judge` | which side calls `local_model` takes: `judge`, `nudge` (the redirect writer), `proposer`, separated by commas |
 | `local_judge_confidence` | `0.9` | how sure a stuck verdict from the on-device judge must be to count; below it the turn is spared |

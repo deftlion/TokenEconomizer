@@ -19,8 +19,10 @@ Each session is folded once, at its first end, keyed by session id; a resumed se
 re-folded, because counting the same trajectory twice would hand the fact lifecycle confirmations
 it did not earn.
 """
+import logging
 import os
 import shutil
+import sys
 import tempfile
 import time
 
@@ -29,6 +31,24 @@ from . import accounting, denylist, sidecall
 from . import adapter as live_adapter
 from .adapter import LiveAdapter, load_catalog
 from .hosts import FoldLater
+
+class _StderrHandler(logging.StreamHandler):
+    def emit(self, record):
+        self.stream = sys.stderr
+        super().emit(record)
+
+
+def _configured_level(record):
+    # Different repositories can fold concurrently with different configured levels.
+    level = getattr(record, "fold_log_level", "warning").upper()
+    return record.levelno >= getattr(logging, level, logging.WARNING)
+
+
+logger = logging.Logger("tokeneconomizer.fold", logging.DEBUG)
+_handler = _StderrHandler()
+_handler.setFormatter(logging.Formatter("fold %(levelname)s: %(message)s"))
+_handler.addFilter(_configured_level)
+logger.addHandler(_handler)
 
 STALE_S = 600          # an unfolded session whose transcript is quiet this long is over
 # A fold never runs in a hook -- it is a detached process, or `te fold` -- so it can wait for
@@ -491,10 +511,13 @@ def fold_session(ctx, session_id, transcript_path=None):
     under way (the session stays pending, and the import folds it once it is done, else the
     next session start does). That is checked before the lock is taken too, so that a fold
     never waits on an import's lock."""
+    log_config = {"fold_log_level": getattr(ctx.config, "log_level", "warning")}
     if import_blocks(ctx):
+        logger.log(logging.DEBUG, "session deferred: history import in progress", extra=log_config)
         return None
     with ctx.store.locked("fold", timeout=FOLD_LOCK_WAIT_S) as got:
         if not got or import_blocks(ctx):
+            logger.log(logging.DEBUG, "session deferred: fold lock or history import", extra=log_config)
             return None
         return fold_locked(ctx, session_id, transcript_path)
 
@@ -506,10 +529,13 @@ def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None
     no model is called, no deny rule is held, written or given back, and its ledger record and
     `folded.json` entry say `imported`. `span` is (started, ended) for a session the plugin
     never recorded."""
+    log_config = {"fold_log_level": getattr(ctx.config, "log_level", "warning")}
     sess_name = os.path.join("sessions", f"{session_id}.json")
     folded = ctx.store.read("folded.json") or {}
     if session_id in folded:
+        logger.log(logging.DEBUG, "session already folded", extra=log_config)
         return None
+    logger.log(logging.INFO, "folding session (imported=%s)", imported, extra=log_config)
     sess = {} if imported else (ctx.store.read(sess_name) or {})
     if imported:
         transcript = transcript_path
@@ -518,6 +544,7 @@ def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None
             transcript = ctx.host.complete(transcript_path or sess.get("transcript"), session_id,
                                            sess.get("cwd") or ctx.repo.root, sess)
         except FoldLater:
+            logger.log(logging.DEBUG, "session deferred: transcript not ready", extra=log_config)
             return None
     started, ended = span or (sess.get("started"), sess.get("ended"))
     record = {"kind": "session", "session_id": session_id, "host": ctx.host.name,
@@ -534,6 +561,7 @@ def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None
             prompts = None
         record["prompts"] = prompts
         if not trace_path:
+            logger.log(logging.WARNING, "session transcript unreadable", extra=log_config)
             record["error"] = "transcript unreadable"
         else:
             run_dir = _run_dir(workdir, trace_path)
@@ -585,6 +613,7 @@ def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None
         if sess:
             sess["folded"] = True
             ctx.store.write(sess_name, sess)
+        logger.log(logging.INFO, "session folded", extra=log_config)
         return record
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
