@@ -1,5 +1,5 @@
 # Maintainer: Jeff C <pub@jeffc.ca>
-pkgname=tokeneconomizer
+pkgname=python-tokeneconomizer
 pkgver=0.1.1.r221.g97fd328
 pkgrel=1
 pkgdesc='Token-efficiency tools and agent plugins for Claude Code, Codex, Copilot CLI and Pi'
