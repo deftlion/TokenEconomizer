@@ -2,12 +2,14 @@
 """TokenEconomizer command line (`te status`, `te toolprune show`, `te config`, ...).
 
 A xonsh port of `te`: run `te_bootstrap.py cli` under $TE_PYTHON when set, otherwise the first
-Python 3 found, passing the arguments through. During discovery on Windows the Microsoft Store
+usable Python 3.10+ found (or the first older Python if none is new enough), passing the
+arguments through. During discovery on Windows the Microsoft Store
 alias under WindowsApps runs nothing, and every probe of it starts AppXSvc (python/pymanager#396),
 so a Python outside WindowsApps is tried first and the alias is probed only as a last resort;
 `py` is the final candidate.
 """
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -65,9 +67,23 @@ if windows:
         if locate_executable(name) and !(@(name) -c "" < @(os.devnull)):
             hand_off(name, *launcher_flags(name))
 else:
-    for name in ("python3", "python"):
-        if locate_executable(name):
+    old = None
+    probe = "import sys; sys.exit(sys.version_info < (3, 10))"
+    for name in ("python3", "python3.15", "python3.14", "python3.13", "python3.12",
+                 "python3.11", "python3.10", "python"):
+        if not locate_executable(name):
+            continue
+        try:
+            result = subprocess.run([name, "-E", "-S", "-c", probe], stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            continue
+        if result.returncode == 0:
             hand_off(name)
+        if result.returncode == 1 and old is None:
+            old = name
+    if old:
+        hand_off(old)
 
 print("te: no python3 on PATH (set TE_PYTHON)", file=sys.stderr)
 sys.exit(1)
