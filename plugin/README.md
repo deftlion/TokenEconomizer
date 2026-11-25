@@ -1089,6 +1089,7 @@ above the guard's own `judge_confidence` (0.7).
 | a command prints an import error, or the hooks seem to do nothing | run `~/.tokeneconomizer/bin/te doctor` (or `plugin/scripts/te doctor` in the clone) and read its errors.log lines |
 | errors.log says the package "was not found for the plugin" | the clone the plugin was installed from moved or is gone (on Codex from GitHub, its checkout under `$CODEX_HOME/.tmp/marketplaces/`): add it again, or use the [self-contained install](#codex) |
 | `TokenEconomizer needs Python >= 3.10 (this is 3.x)` | install Python 3.10+ or set `TE_PYTHON` to one |
+| no paid micro-skill is injected | Run `te microskills` to see the last paid proposal's status and counts. An admitted fact may still need more evidence before it can be injected. |
 | the deny list leaves nothing out after many sessions | run `toolprune refresh-catalog` (Claude Code, Copilot) |
 | a Codex deny list was applied but nothing changed | trust the project in Codex; `~/.tokeneconomizer/bin/te --host codex doctor` says whether it is trusted |
 | errors.log has `sidecall copilot: no reply`, and a session start says the plugin's model calls are paused | they cannot use a Copilot BYOK provider ([Copilot CLI](#copilot-cli)): micro-skills keeps its facts that need no model call (`microskills=envfacts` stops trying the proposer), and the loop guard redirects only at its backstop. Once Copilot is signed in, `config set microskills=on` (or `loopguard=on`) tries again |

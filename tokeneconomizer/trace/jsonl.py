@@ -2,8 +2,8 @@
 import json
 
 
-def lines(path):
-    """Non-empty, stripped lines of a text file; nothing when it cannot be read."""
+def lines(path, *, strict=False):
+    """Non-empty, stripped lines; suppress I/O errors unless the caller needs to detect them."""
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
@@ -11,12 +11,13 @@ def lines(path):
                 if line:
                     yield line
     except OSError:
-        return
+        if strict:
+            raise
 
 
-def records(path):
+def records(path, *, strict=False):
     """Each line of a JSONL file that parses to a JSON object."""
-    for line in lines(path):
+    for line in lines(path, strict=strict):
         try:
             ev = json.loads(line)
         except ValueError:

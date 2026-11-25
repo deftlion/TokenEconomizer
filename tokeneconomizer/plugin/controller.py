@@ -506,6 +506,8 @@ class LiveController:
         self._close_turn(s, stopped_normally=self.host.completed_at_end(self.p))
         s["ended"] = time.time()
         s["end_reason"] = self.p.get("reason")
+        if self.host.name == "pi":
+            s["pi_empty_session"] = self.p.get("pi_empty_session") is True
         self._save(s)
         fold.spawn_fold(self.ctx, [self.sid])
         return {}

@@ -259,7 +259,15 @@ export default function tokeneconomizer(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (event, ctx) => {
-    await hook({ ...base(ctx), hook_event_name: "SessionEnd", reason: event.reason }, ctx.mode);
+    // Pi does not create a transcript until there is a user or assistant message.
+    // Check the entire session, not just the active branch (which may have been rewound).
+    const entries = ctx.sessionManager.getEntries?.();
+    const empty = prompts === 0 && Array.isArray(entries) && !entries.some(
+      (e) => e.type === "message" && ["user", "assistant"].includes(e.message.role),
+    );
+    await hook({
+      ...base(ctx), hook_event_name: "SessionEnd", reason: event.reason, pi_empty_session: empty,
+    }, ctx.mode);
   });
 
   pi.registerCommand("te", {

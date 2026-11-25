@@ -316,6 +316,9 @@ def cmd_microskills(args):
             return 0
     text = inj.get("rendered") or ""
     print(text.rstrip() or "(nothing injected yet: no fact has cleared its firing gate)")
+    proposal = inj.get("last_proposal")
+    if proposal:
+        print("\nlast paid proposal: " + json.dumps(proposal, sort_keys=True))
     facts = inj.get("facts") or {}
     rows = [(k, v) for k, v in facts.items() if isinstance(v, dict) and "state" in v]
     if rows:

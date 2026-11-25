@@ -28,6 +28,10 @@ class ComposedDistiller:
         return self.dist.opt_tokens
 
     @property
+    def last_proposal(self):
+        return self.dist.last_proposal
+
+    @property
     def now(self):
         return self.dist.now
 
@@ -114,6 +118,10 @@ class PrefixStage(Stage):
         """The environment facts the last `render` chose, [] without that layer."""
         get = getattr(self.distiller, "injected_ids", None)
         return get() if get else []
+
+    @property
+    def last_proposal(self):
+        return getattr(self.distiller, "last_proposal", None)
 
     def after_task(self, task, row, run_dir_path, srow):
         """Fold the finished task into the fact lifecycle; return (opt_tokens, reason).

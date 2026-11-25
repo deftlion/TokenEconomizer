@@ -115,12 +115,16 @@ def _fold_microskills(ctx, adapter, run_dir, session_id, injected=None, imported
     opt_tokens, reason = stage.after_task(task, {}, run_dir, srow)
     rendered = stage.render() or ""
     prior = ctx.store.read("injection.json") or {}
-    ctx.store.write("injection.json", {
+    injection = {
         "profile": profile, "reason": reason, "rendered": rendered,
         "rendered_ids": stage.injected_ids(),
         "facts": srow.get("manual_facts"), "updated": time.time(),
         "sessions": int(prior.get("sessions", 0)) + 1,
-        "imported_sessions": int(prior.get("imported_sessions", 0)) + bool(imported)})
+        "imported_sessions": int(prior.get("imported_sessions", 0)) + bool(imported)}
+    last_proposal = stage.last_proposal or prior.get("last_proposal")
+    if last_proposal is not None:
+        injection["last_proposal"] = last_proposal
+    ctx.store.write("injection.json", injection)
     return {"optimizer_tokens": float(opt_tokens or 0), "rendered_chars": len(rendered)}
 
 
@@ -522,6 +526,18 @@ def fold_session(ctx, session_id, transcript_path=None):
         return fold_locked(ctx, session_id, transcript_path)
 
 
+def _transcript_missing(path):
+    if not path:
+        return True
+    try:
+        os.stat(path)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        pass  # inaccessible is not evidence of absence
+    return False
+
+
 def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None):
     """`fold_session` for a caller that holds the "fold" lock (the history import holds it for
     its whole run). With `imported`, the session is one from the agent's history, read once
@@ -561,8 +577,12 @@ def fold_locked(ctx, session_id, transcript_path=None, imported=False, span=None
             prompts = None
         record["prompts"] = prompts
         if not trace_path:
-            logger.log(logging.WARNING, "session transcript unreadable", extra=log_config)
-            record["error"] = "transcript unreadable"
+            if (ctx.host.name == "pi" and sess.get("pi_empty_session") is True
+                    and not sess.get("turns") and _transcript_missing(transcript)):
+                record.update(prompts=0, empty_session=True)
+            else:
+                logger.log(logging.WARNING, "session transcript unreadable", extra=log_config)
+                record["error"] = "transcript unreadable"
         else:
             run_dir = _run_dir(workdir, trace_path)
             # An earlier session is scored against the tools its own log shows (used, listed),

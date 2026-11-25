@@ -11,13 +11,12 @@ reasoning, and `cacheWrite1h` is a subset of `cacheWrite` -- so the mapping to t
 fields is direct, and `cacheWrite1h` is their 1-hour share (`cache_creation_1h_input_tokens`).
 """
 import json
-import os
 
 from .jsonl import records
 
 
-def _pi_entries(path):
-    return list(records(path))
+def _pi_entries(path, *, strict=False):
+    return list(records(path, strict=strict))
 
 
 def pi_session_header(path):
@@ -74,11 +73,14 @@ def pi_session_to_claude(path, out_path):
     Pi starts every shell command afresh in the session's directory, so each call is written
     with the header's `cwd`: an agent that types `cd /abs/repo && tox` into that directory ran
     plain `tox`, and is read that way. Returns the number of tool calls written, or None when
-    the file is missing."""
-    if not path or not os.path.exists(path):
+    the file is missing or cannot be read."""
+    if not path:
+        return None
+    try:
+        entries = _pi_entries(path, strict=True)
+    except OSError:
         return None
     n = 0
-    entries = _pi_entries(path)
     head = entries[0] if entries and entries[0].get("type") == "session" else {}
     cwd = head.get("cwd") if isinstance(head.get("cwd"), str) else None
     with open(out_path, "w", encoding="utf-8") as out:
