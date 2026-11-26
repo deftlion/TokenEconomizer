@@ -70,24 +70,9 @@ import tempfile
 
 from .. import trace
 from . import accounting
+from .diag_log import make_stderr_logger
 
-
-class _StderrHandler(logging.StreamHandler):
-    def emit(self, record):
-        self.stream = sys.stderr
-        super().emit(record)
-
-
-def _configured_level(record):
-    level = getattr(record, "sidecall_log_level", "warning").upper()
-    return record.levelno >= getattr(logging, level, logging.WARNING)
-
-
-logger = logging.Logger("tokeneconomizer.sidecall", logging.DEBUG)
-_handler = _StderrHandler()
-_handler.setFormatter(logging.Formatter("sidecall %(levelname)s: %(message)s"))
-_handler.addFilter(_configured_level)
-logger.addHandler(_handler)
+logger = make_stderr_logger("tokeneconomizer.sidecall", "sidecall", "sidecall_log_level")
 
 
 def _obj(v):

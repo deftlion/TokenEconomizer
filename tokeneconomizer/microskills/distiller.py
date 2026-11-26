@@ -25,6 +25,7 @@ from ..pricing import runner_effective_or_approx
 from ..trace import SHELL_TOOLS, call_cwds, tool_kind
 from ..trace.claude import CONVERSATION
 from .lifecycle import Forgetting, Lifecycle, edited_files, edited_pyfiles, write_json_atomic
+from .outcomes import apply_proposal_outcome, parse_payload_with_outcome
 
 # ---- proposer cadence / caps / gates ---------------------------------------
 PROPOSE_EVERY  = 8      # one LLM proposer call per this many tasks (PrefixStage rebinds
@@ -529,40 +530,8 @@ def build_proposer_prompt(repo, window, existing, existing_feats, raw_excerpts,
 
 
 def parse_payload(raw):
-    exts, facts, _ = _parse_payload(raw)
+    exts, facts, _ = parse_payload_with_outcome(raw, _detector_fields_ok)
     return exts, facts
-
-
-def _parse_payload(raw):
-    if not raw or (isinstance(raw, str) and not raw.strip()):
-        return [], [], {"status": "no-reply"}
-    # Preserve the existing brace-framed parser (e.g. for fenced replies).
-    m = re.search(r"\{.*\}", raw, re.S) if isinstance(raw, str) else None
-    try:
-        obj = json.loads(m.group(0)) if m else None
-    except (ValueError, RecursionError):
-        obj = None
-    if obj is None:
-        try:
-            json.loads(raw)
-        except (ValueError, TypeError, RecursionError):
-            return [], [], {"status": "malformed-json"}
-        return [], [], {"status": "non-object-json"}
-
-    raw_exts, raw_facts = obj.get("extractors", []), obj.get("facts", [])
-    exts = [e for e in (raw_exts if isinstance(raw_exts, list) else [])
-            if isinstance(e, dict) and isinstance(e.get("name"), str) and e.get("name")
-            and isinstance(e.get("pattern"), str) and e.get("pattern")]
-    facts = [f for f in (raw_facts if isinstance(raw_facts, list) else [])
-             if isinstance(f, dict) and isinstance(f.get("id"), str) and f.get("id")
-             and isinstance(f.get("detector"), dict) and f.get("detector")
-             and _detector_fields_ok(f["detector"])
-             and (f.get("cite") is None or isinstance(f.get("cite"), list))]
-    ext_drops = len(raw_exts) - len(exts) if isinstance(raw_exts, list) else 1
-    fact_drops = len(raw_facts) - len(facts) if isinstance(raw_facts, list) else 1
-    status = "processed" if exts or facts else "filtered" if ext_drops or fact_drops else "empty"
-    return exts, facts, {"status": status, "extractors_filtered": ext_drops,
-                        "facts_filtered": fact_drops}
 
 
 def _detector_fields_ok(det):
@@ -690,21 +659,8 @@ class Distiller(Forgetting):
         # Charged as every paid side call is: the usage the runner recovered, else an estimate on
         # the same basis (prompt at 1x, reply at 5x), so a CLI that reports none is not free.
         self.opt_tokens += runner_effective_or_approx(self.runner, prompt, raw or "", eff)
-        exts, facts, outcome = _parse_payload(raw)
-        if outcome["status"] == "processed":
-            admitted = sum(self._admit_extractor(e) for e in exts)  # append-only
-            # A forgotten id is refused at admission anyway: keep it from taking a slot.
-            candidates = [f for f in facts if f.get("id") not in self.forgotten]
-            reasons = {}
-            for spec in candidates[:MAX_CANDS]:
-                _, reason = self._admit(spec)
-                code = reason.partition("(")[0]  # collapse grounding-fail(hit/minimum)
-                reasons[code] = reasons.get(code, 0) + 1
-            outcome.update(extractors_admitted=admitted, extractors_rejected=len(exts) - admitted,
-                           facts_forgotten=len(facts) - len(candidates),
-                           facts_over_limit=max(0, len(candidates) - MAX_CANDS),
-                           fact_outcomes=reasons)
-        self.last_proposal = outcome
+        self.last_proposal = apply_proposal_outcome(
+            raw, self, _detector_fields_ok, MAX_CANDS)
         self.last_propose = self.now
 
     def _admit_extractor(self, spec):

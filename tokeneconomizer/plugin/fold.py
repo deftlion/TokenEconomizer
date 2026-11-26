@@ -22,7 +22,6 @@ it did not earn.
 import logging
 import os
 import shutil
-import sys
 import tempfile
 import time
 
@@ -30,25 +29,10 @@ from .. import trace
 from . import accounting, denylist, sidecall
 from . import adapter as live_adapter
 from .adapter import LiveAdapter, load_catalog
+from .diag_log import make_stderr_logger
 from .hosts import FoldLater
 
-class _StderrHandler(logging.StreamHandler):
-    def emit(self, record):
-        self.stream = sys.stderr
-        super().emit(record)
-
-
-def _configured_level(record):
-    # Different repositories can fold concurrently with different configured levels.
-    level = getattr(record, "fold_log_level", "warning").upper()
-    return record.levelno >= getattr(logging, level, logging.WARNING)
-
-
-logger = logging.Logger("tokeneconomizer.fold", logging.DEBUG)
-_handler = _StderrHandler()
-_handler.setFormatter(logging.Formatter("fold %(levelname)s: %(message)s"))
-_handler.addFilter(_configured_level)
-logger.addHandler(_handler)
+logger = make_stderr_logger("tokeneconomizer.fold", "fold", "fold_log_level")
 
 STALE_S = 600          # an unfolded session whose transcript is quiet this long is over
 # A fold never runs in a hook -- it is a detached process, or `te fold` -- so it can wait for
