@@ -3,7 +3,7 @@ import json
 import re
 
 
-def parse_payload_with_outcome(raw, detector_fields_ok):
+def parse_payload_with_outcome(raw, parse_payload):
     """Parse proposer JSON into `(extractors, facts, outcome)` without retaining raw text."""
     if not raw or (isinstance(raw, str) and not raw.strip()):
         return [], [], {"status": "no-reply"}
@@ -21,14 +21,7 @@ def parse_payload_with_outcome(raw, detector_fields_ok):
         return [], [], {"status": "non-object-json"}
 
     raw_exts, raw_facts = obj.get("extractors", []), obj.get("facts", [])
-    exts = [e for e in (raw_exts if isinstance(raw_exts, list) else [])
-            if isinstance(e, dict) and isinstance(e.get("name"), str) and e.get("name")
-            and isinstance(e.get("pattern"), str) and e.get("pattern")]
-    facts = [f for f in (raw_facts if isinstance(raw_facts, list) else [])
-             if isinstance(f, dict) and isinstance(f.get("id"), str) and f.get("id")
-             and isinstance(f.get("detector"), dict) and f.get("detector")
-             and detector_fields_ok(f["detector"])
-             and (f.get("cite") is None or isinstance(f.get("cite"), list))]
+    exts, facts = parse_payload(raw)
     ext_drops = len(raw_exts) - len(exts) if isinstance(raw_exts, list) else 1
     fact_drops = len(raw_facts) - len(facts) if isinstance(raw_facts, list) else 1
     status = "processed" if exts or facts else "filtered" if ext_drops or fact_drops else "empty"
@@ -36,9 +29,9 @@ def parse_payload_with_outcome(raw, detector_fields_ok):
                         "facts_filtered": fact_drops}
 
 
-def apply_proposal_outcome(raw, distiller, detector_fields_ok, max_cands):
+def apply_proposal_outcome(raw, distiller, parse_payload, max_cands):
     """Parse `raw`, admit extractors/facts onto `distiller`, and return bounded outcome counts."""
-    exts, facts, outcome = parse_payload_with_outcome(raw, detector_fields_ok)
+    exts, facts, outcome = parse_payload_with_outcome(raw, parse_payload)
     if outcome["status"] == "processed":
         admitted = sum(distiller._admit_extractor(e) for e in exts)  # append-only
         # A forgotten id is refused at admission anyway: keep it from taking a slot.
@@ -48,8 +41,10 @@ def apply_proposal_outcome(raw, distiller, detector_fields_ok, max_cands):
             _, reason = distiller._admit(spec)
             code = reason.partition("(")[0]  # collapse grounding-fail(hit/minimum)
             reasons[code] = reasons.get(code, 0) + 1
-        outcome.update(extractors_admitted=admitted, extractors_rejected=len(exts) - admitted,
-                       facts_forgotten=len(facts) - len(candidates),
-                       facts_over_limit=max(0, len(candidates) - max_cands),
-                       fact_outcomes=reasons)
+        return {**outcome,
+                "extractors_admitted": admitted,
+                "extractors_rejected": len(exts) - admitted,
+                "facts_forgotten": len(facts) - len(candidates),
+                "facts_over_limit": max(0, len(candidates) - max_cands),
+                "fact_outcomes": reasons}
     return outcome

@@ -25,7 +25,7 @@ from ..pricing import runner_effective_or_approx
 from ..trace import SHELL_TOOLS, call_cwds, tool_kind
 from ..trace.claude import CONVERSATION
 from .lifecycle import Forgetting, Lifecycle, edited_files, edited_pyfiles, write_json_atomic
-from .outcomes import apply_proposal_outcome, parse_payload_with_outcome
+from .outcomes import apply_proposal_outcome
 
 # ---- proposer cadence / caps / gates ---------------------------------------
 PROPOSE_EVERY  = 8      # one LLM proposer call per this many tasks (PrefixStage rebinds
@@ -530,7 +530,22 @@ def build_proposer_prompt(repo, window, existing, existing_feats, raw_excerpts,
 
 
 def parse_payload(raw):
-    exts, facts, _ = parse_payload_with_outcome(raw, _detector_fields_ok)
+    m = re.search(r"\{.*\}", raw or "", re.S)
+    if not m:
+        return [], []
+    try:
+        obj = json.loads(m.group(0))
+    except Exception:
+        return [], []
+    exts, facts = obj.get("extractors"), obj.get("facts")
+    exts = [e for e in (exts if isinstance(exts, list) else [])
+            if isinstance(e, dict) and isinstance(e.get("name"), str) and e.get("name")
+            and isinstance(e.get("pattern"), str) and e.get("pattern")]
+    facts = [f for f in (facts if isinstance(facts, list) else [])
+             if isinstance(f, dict) and isinstance(f.get("id"), str) and f.get("id")
+             and isinstance(f.get("detector"), dict) and f.get("detector")
+             and _detector_fields_ok(f["detector"])
+             and (f.get("cite") is None or isinstance(f.get("cite"), list))]
     return exts, facts
 
 
@@ -660,7 +675,7 @@ class Distiller(Forgetting):
         # the same basis (prompt at 1x, reply at 5x), so a CLI that reports none is not free.
         self.opt_tokens += runner_effective_or_approx(self.runner, prompt, raw or "", eff)
         self.last_proposal = apply_proposal_outcome(
-            raw, self, _detector_fields_ok, MAX_CANDS)
+            raw, self, parse_payload, MAX_CANDS)
         self.last_propose = self.now
 
     def _admit_extractor(self, spec):
